@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>批量命令执行</h3>
+
+<div class="card mb-4">
+    <div class="card-header">选择主机</div>
+    <div class="card-body">
+        <div class="mb-2">
+            <button class="btn btn-sm btn-outline-primary" onclick="toggleAll()">全选/取消</button>
+        </div>
+        {% for host in hosts %}
+        <div class="form-check">
+            <input class="form-check-input host-cb" type="checkbox" value="{{ host.id }}" id="host-{{ host.id }}">
+            <label class="form-check-label" for="host-{{ host.id }}">
+                {{ host.name }} ({{ host.hostname }})
+                <span class="badge bg-{{ 'success' if host.status == 'online' else 'secondary' }}">{{ host.status }}</span>
+            </label>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">执行命令</div>
+    <div class="card-body">
+        <textarea id="command" class="form-control mb-3" rows="3" placeholder="输入要执行的命令，如 df -h"></textarea>
+        <button id="runBtn" class="btn btn-primary" onclick="runCommand()">执行</button>
+    </div>
+</div>
+
+<div id="results"></div>
+
+<script>
+function toggleAll() {
+    document.querySelectorAll('.host-cb').forEach(cb => cb.checked = !cb.checked);
+}
+
+function runCommand() {
+    var command = document.getElementById('command').value.trim();
+    var hostIds = [];
+    document.querySelectorAll('.host-cb:checked').forEach(cb => hostIds.push(cb.value));
+    
+    if (!command) { alert('请输入命令'); return; }
+    if (hostIds.length === 0) { alert('请选择主机'); return; }
+
+    var btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.textContent = '执行中...';
+    document.getElementById('results').innerHTML = '<div class="text-muted">正在执行...</div>';
+
+    fetch('/exec/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: command, host_ids: hostIds})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = '执行';
+        if (data.code !== 200) {
+            alert(data.msg);
+            return;
+        }
+        var html = '<h5 class="mt-3">执行结果</h5>';
+        data.data.forEach(r => {
+            var color = r.success ? 'success' : 'danger';
+            html += '<div class="card mb-2 border-' + color + '">';
+            html += '<div class="card-header bg-' + color + ' text-white d-flex justify-content-between">';
+            html += '<span>' + r.host_name + ' (' + r.hostname + ')</span>';
+            html += '<span>退出码: ' + r.exit_code + '</span></div>';
+            html += '<div class="card-body"><pre class="mb-0" style="max-height:200px;overflow:auto">' + (r.output || r.error) + '</pre></div>';
+            html += '</div>';
+        });
+        document.getElementById('results').innerHTML = html;
+    });
+}
+</script>
+{% endblock %}

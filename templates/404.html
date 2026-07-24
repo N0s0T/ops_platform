@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="text-align:center;padding:2rem 0;">
+    <img src="{{ url_for('static', filename='404.png') }}" alt="404"
+        style="max-width:400px;border-radius:8px;margin-bottom:1rem;">
+    <h1 style="font-size:5rem;color:#ccc;margin-bottom:.5rem;">404</h1>
+    <p style="color:#666;font-size:1.1rem;margin-bottom:1.5rem;">页面不存在</p>
+    <a href="/hosts" style="background:#0d6efd;color:#fff;padding:.5rem 1.2rem;border-radius:4px;text-decoration:none;">返回首页</a>
+</div>
+{% endblock %}

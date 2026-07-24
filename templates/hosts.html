@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>主机管理</h3>
+
+<!-- 添加主机表单 -->
+<div class="card mb-4">
+    <div class="card-header">添加主机</div>
+    <div class="card-body">
+        <form method="post" action="/hosts/add">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <input type="text" name="name" class="form-control" placeholder="名称" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="hostname" class="form-control" placeholder="IP/主机名" required>
+                </div>
+                <div class="col-md-1">
+                    <input type="number" name="port" class="form-control" value="22">
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="username" class="form-control" value="root">
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="password" class="form-control" placeholder="密码" required>
+                </div>
+                <div style="margin-bottom:.8rem;">
+                    <label style="font-size:.85rem;color:#333;">分组</label><br>
+                    <input type="text" name="group_name" placeholder="例如：web服务器" value="default"
+                          style="width:100%;padding:.4rem .6rem;border:1px solid #ccc;border-radius:4px;">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">添加</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 分组筛选 -->
+<div style="margin-bottom:1rem;display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;">
+    <span style="font-size:.85rem;color:#666;">分组：</span>
+    <a href="/hosts"
+        style="padding:.2rem .6rem;border-radius:10px;text-decoration:none;font-size:.8rem;
+        {{ 'background:#0d6efd;color:#fff;' if not current_group else 'background:#e9ecef;color:#333;' }}">
+        全部
+    </a>
+    {% for g in groups %}
+    <a href="/hosts?group={{ g }}"
+        style="padding:.2rem .6rem;border-radius:10px;text-decoration:none;font-size:.8rem;
+        {{ 'background:#0d6efd;color:#fff;' if current_group == g else 'background:#e9ecef;color:#333;' }}">
+        {{ g }}
+    </a>
+    {% endfor %}
+</div>
+
+<!-- 主机列表 -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>名称</th>
+            <th>IP/主机名</th>
+            <th>端口</th>
+            <th>用户名</th>
+            <th>分组</th>
+            <th>状态</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for host in hosts %}
+        <tr id="host-{{ host.id }}">
+            <td>{{ host.name }}</td>
+            <td>{{ host.hostname }}</td>
+            <td>{{ host.port }}</td>
+            <td>{{ host.username }}</td>
+            <td>{{ host.group_name }}</td>
+            <td>
+                <span class="badge bg-{{ 'success' if host.status == 'online' else 'secondary' }}">
+                    {{ host.status }}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-success" onclick="testHost({{ host.id }})">测试</button>
+                <a href="/hosts/delete/{{ host.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除?')">删除</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+function testHost(hostId) {
+    fetch('/hosts/test/' + hostId)
+        .then(r => r.json())
+        .then(data => {
+            alert(data.success ? '连接成功: ' + data.status : '连接失败: ' + data.message);
+            location.reload();
+        });
+}
+</script>
+{% endblock %}
