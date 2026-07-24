@@ -254,7 +254,7 @@ CREATE DATABASE ops_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 **2. 克隆项目**
 
 ```bash
-git clone https://github.com/your-username/ops-platform.git
+git clone https://github.com/N0s0T/ops-platform.git
 cd ops-platform
 ```
 
