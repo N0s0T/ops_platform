@@ -4,3 +4,4 @@ uploads/*
 !uploads/.gitkeep
 *.db
 .env
+celerybeat-schedule*

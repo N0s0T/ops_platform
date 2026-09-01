@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>批量命令执行</h3>
+<h3>命令执行</h3>
 
-<div class="card mb-4">
-    <div class="card-header">选择主机</div>
+<!-- 选择主机 -->
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>选择主机</span>
+        <button class="btn btn-sm btn-outline-primary" onclick="toggleAll()">全选/取消</button>
+    </div>
     <div class="card-body">
-        <div class="mb-2">
-            <button class="btn btn-sm btn-outline-primary" onclick="toggleAll()">全选/取消</button>
-        </div>
         {% for host in hosts %}
-        <div class="form-check">
+        <div class="form-check d-inline-block me-3">
             <input class="form-check-input host-cb" type="checkbox" value="{{ host.id }}" id="host-{{ host.id }}">
             <label class="form-check-label" for="host-{{ host.id }}">
                 {{ host.name }} ({{ host.hostname }})
@@ -20,33 +21,154 @@
     </div>
 </div>
 
-<div class="card mb-4">
+<!-- 输入命令 + 执行方式 -->
+<div class="card mb-3">
     <div class="card-header">执行命令</div>
     <div class="card-body">
         <textarea id="command" class="form-control mb-3" rows="3" placeholder="输入要执行的命令，如 df -h"></textarea>
-        <button id="runBtn" class="btn btn-primary" onclick="runCommand()">执行</button>
+
+        <div class="mb-3">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="execMode" id="modeNow" value="now" checked onchange="toggleSchedule()">
+                <label class="form-check-label" for="modeNow">立即执行</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="execMode" id="modeSchedule" value="schedule" onchange="toggleSchedule()">
+                <label class="form-check-label" for="modeSchedule">存为定时任务</label>
+            </div>
+        </div>
+
+        <!-- 定时任务配置（默认隐藏） -->
+        <div id="scheduleConfig" style="display:none;">
+            <div class="row g-2 mb-2">
+                <div class="col-md-4">
+                    <label class="form-label small">任务名称</label>
+                    <input type="text" id="taskName" class="form-control" placeholder="例如：每日巡检">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small">
+                        Cron 表达式
+                        <select id="cronTemplate" class="form-select form-select-sm d-inline-block ms-2" style="width:auto;" onchange="fillCron()">
+                            <option value="">快捷选择</option>
+                            <option value="* * * * *">每分钟</option>
+                            <option value="*/5 * * * *">每5分钟</option>
+                            <option value="0 * * * *">每小时整点</option>
+                            <option value="0 9 * * *">每天9点</option>
+                            <option value="0 18 * * *">每天18点</option>
+                            <option value="0 9 * * 1-5">工作日9点</option>
+                            <option value="0 0 1 * *">每月1号</option>
+                        </select>
+                    </label>
+                    <div class="d-flex gap-1">
+                        <div><input type="text" id="cronMin" value="*" class="form-control form-control-sm text-center" style="width:55px;"><small class="text-muted">分</small></div>
+                        <div><input type="text" id="cronHour" value="*" class="form-control form-control-sm text-center" style="width:55px;"><small class="text-muted">时</small></div>
+                        <div><input type="text" id="cronDay" value="*" class="form-control form-control-sm text-center" style="width:55px;"><small class="text-muted">日</small></div>
+                        <div><input type="text" id="cronMonth" value="*" class="form-control form-control-sm text-center" style="width:55px;"><small class="text-muted">月</small></div>
+                        <div><input type="text" id="cronWeek" value="*" class="form-control form-control-sm text-center" style="width:55px;"><small class="text-muted">周</small></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="runBtn" class="btn btn-primary" onclick="submitCommand()">执行</button>
     </div>
 </div>
 
-<div id="results"></div>
+<!-- 下方 Tab 切换 -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabResults" onclick="switchTab('results');return false;">执行结果</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabTasks" onclick="switchTab('tasks');return false;">定时任务列表</a></li>
+</ul>
+
+<!-- 执行结果 -->
+<div id="resultsPanel">
+    <div id="results" class="text-muted">暂无执行结果，选择主机并执行命令后结果将显示在此。</div>
+</div>
+
+<!-- 定时任务列表 -->
+<div id="tasksPanel" style="display:none;">
+    <table class="table table-sm table-bordered" style="font-size:.85rem;">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th><th>名称</th><th>Cron</th><th>命令</th><th>状态</th>
+                <th>上次执行</th><th>结果</th><th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task.id }}</td>
+                <td>{{ task.name }}</td>
+                <td><code>{{ task.cron_expr }}</code></td>
+                <td><code>{{ task.command }}</code></td>
+                <td>
+                    {% if task.is_active %}
+                    <span class="badge bg-success">运行中</span>
+                    {% else %}
+                    <span class="badge bg-secondary">已暂停</span>
+                    {% endif %}
+                </td>
+                <td>{{ task.last_run_at or '—' }}</td>
+                <td>{{ task.last_result or '—' }}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="toggleTask({{ task.id }})">{{ '暂停' if task.is_active else '启动' }}</button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteTask({{ task.id }})">删除</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-3">暂无定时任务</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 <script>
 function toggleAll() {
     document.querySelectorAll('.host-cb').forEach(cb => cb.checked = !cb.checked);
 }
 
-function runCommand() {
+function toggleSchedule() {
+    var mode = document.querySelector('input[name="execMode"]:checked').value;
+    document.getElementById('scheduleConfig').style.display = mode === 'schedule' ? 'block' : 'none';
+    document.getElementById('runBtn').textContent = mode === 'schedule' ? '保存任务' : '执行';
+}
+
+function fillCron() {
+    var tmpl = document.getElementById('cronTemplate').value;
+    if (!tmpl) return;
+    var parts = tmpl.split(' ');
+    document.getElementById('cronMin').value = parts[0];
+    document.getElementById('cronHour').value = parts[1];
+    document.getElementById('cronDay').value = parts[2];
+    document.getElementById('cronMonth').value = parts[3];
+    document.getElementById('cronWeek').value = parts[4];
+}
+
+function getHostIds() {
+    var ids = [];
+    document.querySelectorAll('.host-cb:checked').forEach(cb => ids.push(cb.value));
+    return ids;
+}
+
+function submitCommand() {
     var command = document.getElementById('command').value.trim();
-    var hostIds = [];
-    document.querySelectorAll('.host-cb:checked').forEach(cb => hostIds.push(cb.value));
-    
+    var hostIds = getHostIds();
+
     if (!command) { alert('请输入命令'); return; }
     if (hostIds.length === 0) { alert('请选择主机'); return; }
 
+    var mode = document.querySelector('input[name="execMode"]:checked').value;
+    if (mode === 'now') {
+        runNow(command, hostIds);
+    } else {
+        saveTask(command, hostIds);
+    }
+}
+
+function runNow(command, hostIds) {
     var btn = document.getElementById('runBtn');
     btn.disabled = true;
     btn.textContent = '执行中...';
-    document.getElementById('results').innerHTML = '<div class="text-muted">正在执行...</div>';
 
     fetch('/exec/run', {
         method: 'POST',
@@ -57,22 +179,80 @@ function runCommand() {
     .then(data => {
         btn.disabled = false;
         btn.textContent = '执行';
-        if (data.code !== 200) {
-            alert(data.msg);
-            return;
-        }
-        var html = '<h5 class="mt-3">执行结果</h5>';
-        data.data.forEach(r => {
-            var color = r.success ? 'success' : 'danger';
-            html += '<div class="card mb-2 border-' + color + '">';
-            html += '<div class="card-header bg-' + color + ' text-white d-flex justify-content-between">';
-            html += '<span>' + r.host_name + ' (' + r.hostname + ')</span>';
-            html += '<span>退出码: ' + r.exit_code + '</span></div>';
-            html += '<div class="card-body"><pre class="mb-0" style="max-height:200px;overflow:auto">' + (r.output || r.error) + '</pre></div>';
-            html += '</div>';
-        });
-        document.getElementById('results').innerHTML = html;
+        if (data.code !== 200) { alert(data.msg); return; }
+        switchTab('results');
+        renderResults(data.results);
     });
+}
+
+function saveTask(command, hostIds) {
+    var name = document.getElementById('taskName').value.trim();
+    if (!name) { alert('请输入任务名称'); return; }
+
+    var cronExpr = document.getElementById('cronMin').value.trim() + ' ' +
+                   document.getElementById('cronHour').value.trim() + ' ' +
+                   document.getElementById('cronDay').value.trim() + ' ' +
+                   document.getElementById('cronMonth').value.trim() + ' ' +
+                   document.getElementById('cronWeek').value.trim();
+
+    if (cronExpr.split(' ').length !== 5) { alert('Cron 表达式格式不正确'); return; }
+
+    fetch('/tasks/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, cron_expr: cronExpr, command: command, host_ids: hostIds.map(Number)})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('定时任务已保存');
+            location.reload();
+        } else {
+            alert('保存失败: ' + (data.error || ''));
+        }
+    });
+}
+
+function renderResults(results) {
+    var html = '';
+    results.forEach(function(r) {
+        var color = r.success ? 'success' : 'danger';
+        html += '<div class="card mb-2 border-' + color + '">';
+        html += '<div class="card-header bg-' + color + ' text-white d-flex justify-content-between">';
+        html += '<span>' + (r.host_name || '未知') + ' (' + (r.hostname || '') + ')</span>';
+        html += '<span>退出码: ' + (r.exit_code !== undefined ? r.exit_code : '-') + '</span></div>';
+        html += '<div class="card-body"><pre class="mb-0" style="max-height:200px;overflow:auto">' +
+                (r.output || r.error || '') + '</pre></div>';
+        html += '</div>';
+    });
+    document.getElementById('results').innerHTML = html;
+}
+
+function switchTab(name) {
+    if (name === 'results') {
+        document.getElementById('resultsPanel').style.display = 'block';
+        document.getElementById('tasksPanel').style.display = 'none';
+        document.getElementById('tabResults').classList.add('active');
+        document.getElementById('tabTasks').classList.remove('active');
+    } else {
+        document.getElementById('resultsPanel').style.display = 'none';
+        document.getElementById('tasksPanel').style.display = 'block';
+        document.getElementById('tabResults').classList.remove('active');
+        document.getElementById('tabTasks').classList.add('active');
+    }
+}
+
+function toggleTask(taskId) {
+    fetch('/tasks/toggle/' + taskId, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert('操作失败'); });
+}
+
+function deleteTask(taskId) {
+    if (!confirm('确定删除任务 #' + taskId + '？')) return;
+    fetch('/tasks/delete/' + taskId, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert('删除失败'); });
 }
 </script>
 {% endblock %}

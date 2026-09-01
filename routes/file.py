@@ -1,5 +1,6 @@
+"""文件分发：SFTP 并发上传到多台主机"""
 import os
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from routes.auth import login_required
 from models import db, Host
@@ -27,48 +28,31 @@ def distribute_file():
         return jsonify({'code': 400, 'msg': '请选择主机'})
 
     filename = secure_filename(file.filename)
-    local_path = os.path.join(os.path.dirname(__file__), '..', 'uploads', filename)
+    upload_dir = os.path.join(os.path.dirname(__file__), '..', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    local_path = os.path.join(upload_dir, filename)
     file.save(local_path)
 
-    hosts = Host.query.filter(Host.id.in_(host_ids)).all()
-    results = []
+    hosts = Host.query.filter(Host.id.in_([int(h) for h in host_ids])).all()
 
     def upload_to_host(host):
         try:
             with SSHManager(host.hostname, host.port, host.username, host.password) as ssh:
                 target = remote_path + '/' + filename
                 ssh.upload_file(local_path, target)
-                return {
-                    'success': True,
-                    'host_name': host.name,
-                    'hostname': host.hostname,
-                    'path': target
-                }
+                return {'success': True, 'host_name': host.name, 'hostname': host.hostname, 'path': target}
         except Exception as e:
-            return {
-                'success': False,
-                'host_name': host.name,
-                'hostname': host.hostname,
-                'error': str(e)
-            }
+            return {'success': False, 'host_name': host.name, 'hostname': host.hostname, 'error': str(e)}
 
+    results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(upload_to_host, host): host for host in hosts}
         for future in as_completed(futures):
             results.append(future.result())
 
-        # 清理本地临时文件（Windows 上可能被占用，加 try-except 容错）
     try:
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        os.remove(local_path)
     except PermissionError:
-        pass  # 文件被占用时跳过清理，不影响功能
+        pass
 
-    return jsonify({'code': 200, 'data': results})
-
-"""
-文件分发模块
-- 上传文件到服务器临时目录
-- 通过 SFTP 分发到目标主机
-- 支持多主机同时分发
-"""
+    return jsonify({'code': 200, 'results': results})

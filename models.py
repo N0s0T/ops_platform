@@ -1,10 +1,4 @@
-"""
-数据库模型定义（ORM）
-- User: 用户表
-- Host: 主机表（含分组、状态）
-- ExecLog: 执行日志表
-- Task: 定时任务表
-"""
+"""ORM 模型：User、Host、ExecLog、Task"""
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -52,6 +46,8 @@ class Task(db.Model):
     name = db.Column(db.String(100), nullable=False)
     cron_expr = db.Column(db.String(100), nullable=False)
     command = db.Column(db.Text, nullable=False)
-    host_ids = db.Column(db.Text, default='[]')  # JSON 格式存储
+    host_ids = db.Column(db.Text, default='[]')
     is_active = db.Column(db.Boolean, default=True)
+    last_run_at = db.Column(db.DateTime, nullable=True)
+    last_result = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now())

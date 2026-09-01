@@ -56,30 +56,36 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     var btn = document.getElementById('uploadBtn');
     btn.disabled = true;
     btn.textContent = '分发中...';
-    document.getElementById('results').innerHTML = '<div class="text-muted">正在分发...</div>';
 
     fetch('/files/upload', {method: 'POST', body: formData})
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
         btn.textContent = '分发';
-        if (data.code !== 200) { alert(data.msg); return; }
-        var html = '<h5 class="mt-3">分发结果</h5>';
-        data.data.forEach(r => {
-            var color = r.success ? 'success' : 'danger';
-            html += '<div class="card mb-2 border-' + color + '">';
-            html += '<div class="card-header bg-' + color + ' text-white">';
-            html += r.host_name + ' (' + r.hostname + ')</div>';
-            html += '<div class="card-body">';
-            if (r.success) {
-                html += '<span class="text-success">上传成功: ' + r.path + '</span>';
-            } else {
-                html += '<span class="text-danger">失败: ' + r.error + '</span>';
-            }
-            html += '</div></div>';
-        });
-        document.getElementById('results').innerHTML = html;
+        if (data.code !== 200) {
+            alert(data.msg);
+            return;
+        }
+        renderResults(data.results);
     });
 });
+
+function renderResults(results) {
+    var html = '<h5 class="mt-3">分发结果</h5>';
+    results.forEach(function(r) {
+        var color = r.success ? 'success' : 'danger';
+        html += '<div class="card mb-2 border-' + color + '">';
+        html += '<div class="card-header bg-' + color + ' text-white">';
+        html += (r.host_name || '未知') + ' (' + (r.hostname || '') + ')</div>';
+        html += '<div class="card-body">';
+        if (r.success) {
+            html += '<span class="text-success">上传成功: ' + r.path + '</span>';
+        } else {
+            html += '<span class="text-danger">失败: ' + r.error + '</span>';
+        }
+        html += '</div></div>';
+    });
+    document.getElementById('results').innerHTML = html;
+}
 </script>
 {% endblock %}
