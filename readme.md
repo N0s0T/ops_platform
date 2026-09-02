@@ -1,6 +1,6 @@
 # Python 自动化运维平台
 
-一个用 Python 写的轻量运维工具，解决一个痛点：**同时给多台 Linux 服务器执行命令、分发文件、定时跑任务**。不用挨个 SSH 登录，打开网页全搞定。
+一个用 Python 写的轻量运维工具，解决一个痛点：**同时给多台 Linux 服务器执行命令、分发文件、定时跑任务**。不用挨个 SSH 登录，在网页上全搞定。
 
 参考 [OpsManage](https://github.com/welliamcao/OpsManage) 和 [Spug](https://github.com/openspug/spug) 设计，用最简架构实现核心功能。
 
